@@ -1,6 +1,6 @@
 /**
  * oclazyload - Load modules on demand (lazy load) with angularJS
- * @version v1.0.10
+ * @version v1.1.0
  * @link https://github.com/ocombe/ocLazyLoad
  * @license MIT
  * @author Olivier Combe <olivier.combe@gmail.com>
@@ -818,7 +818,7 @@
     'use strict';
 
     angular.module('oc.lazyLoad').config(["$provide", function ($provide) {
-        $provide.decorator('$ocLazyLoad', ["$delegate", "$q", "$window", "$interval", function ($delegate, $q, $window, $interval) {
+        $provide.decorator('$ocLazyLoad', ["$delegate", "$q", "$window", "$interval", "$log", "$templateRequest", function ($delegate, $q, $window, $interval, $log, $templateRequest) {
             var uaCssChecked = false,
                 useCssLoadPatch = false,
                 anchor = $window.document.getElementsByTagName('head')[0] || $window.document.getElementsByTagName('body')[0];
@@ -863,35 +863,48 @@
                         el.href = params.cache === false ? cacheBuster(path) : path;
                         break;
                     case 'js':
-                        el = $window.document.createElement('script');
-                        el.src = params.cache === false ? cacheBuster(path) : path;
+                        $templateRequest(params.cache === false ? cacheBuster(path) : path).then(function (content) {
+                            // We have the script content now we can execute it.
+                            try {
+                                eval(content);
+                                loaded = 1;
+                                $delegate._broadcast('ocLazyLoad.fileLoaded', path);
+                                deferred.resolve();
+                            } catch (ex) {
+                                $log.error(ex);
+                                filesCache.remove(path);
+                                deferred.reject(new Error('Unable to load ' + path));
+                            }
+                        });
                         break;
                     default:
                         filesCache.remove(path);
                         deferred.reject(new Error('Requested type "' + type + '" is not known. Could not inject "' + path + '"'));
                         break;
                 }
-                el.onload = el['onreadystatechange'] = function (e) {
-                    if (el['readyState'] && !/^c|loade/.test(el['readyState']) || loaded) return;
-                    el.onload = el['onreadystatechange'] = null;
-                    loaded = 1;
-                    $delegate._broadcast('ocLazyLoad.fileLoaded', path);
-                    deferred.resolve(el);
-                };
-                el.onerror = function () {
-                    filesCache.remove(path);
-                    deferred.reject(new Error('Unable to load ' + path));
-                };
-                el.async = params.serie ? 0 : 1;
+                if (el) {
+                    el.onload = el['onreadystatechange'] = function (e) {
+                        if (el['readyState'] && !/^c|loade/.test(el['readyState']) || loaded) return;
+                        el.onload = el['onreadystatechange'] = null;
+                        loaded = 1;
+                        $delegate._broadcast('ocLazyLoad.fileLoaded', path);
+                        deferred.resolve(el);
+                    };
+                    el.onerror = function () {
+                        filesCache.remove(path);
+                        deferred.reject(new Error('Unable to load ' + path));
+                    };
+                    el.async = params.serie ? 0 : 1;
 
-                var insertBeforeElem = anchor.lastChild;
-                if (params.insertBefore) {
-                    var element = angular.element(angular.isDefined(window.jQuery) ? params.insertBefore : document.querySelector(params.insertBefore));
-                    if (element && element.length > 0) {
-                        insertBeforeElem = element[0];
+                    var insertBeforeElem = anchor.lastChild;
+                    if (params.insertBefore) {
+                        var element = angular.element(angular.isDefined(window.jQuery) ? params.insertBefore : document.querySelector(params.insertBefore));
+                        if (element && element.length > 0) {
+                            insertBeforeElem = element[0];
+                        }
                     }
+                    insertBeforeElem.parentNode.insertBefore(el, insertBeforeElem);
                 }
-                insertBeforeElem.parentNode.insertBefore(el, insertBeforeElem);
 
                 /*
                  The event load or readystatechange doesn't fire in:
