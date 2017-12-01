@@ -2,7 +2,7 @@
     'use strict';
 
     angular.module('oc.lazyLoad').config($provide => {
-        $provide.decorator('$ocLazyLoad', function($delegate, $q, $window, $interval, $log, $templateRequest) {
+        $provide.decorator('$ocLazyLoad', function($delegate, $q, $window, $interval, $templateRequest) {
             var uaCssChecked = false,
                 useCssLoadPatch = false,
                 anchor = $window.document.getElementsByTagName('head')[0] || $window.document.getElementsByTagName('body')[0];
@@ -51,14 +51,16 @@
                             .then(function (content) {
                                 // We have the script content now we can execute it.
                                 try {
+                                    if (params.debug === true) {
+                                        content = "debugger;\n" + content;
+                                    }
                                     eval(content);
                                     loaded = 1;
                                     $delegate._broadcast('ocLazyLoad.fileLoaded', path);
                                     deferred.resolve();
                                 } catch (ex) {
-                                    $log.error(ex);
                                     filesCache.remove(path);
-                                    deferred.reject(new Error(`Unable to load ${ path }`));
+                                    deferred.reject(new Error(`Eval failed for script ${path}. => ${ex.message}`));
                                 }
                             });
                         break;

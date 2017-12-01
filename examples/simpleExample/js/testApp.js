@@ -1,4 +1,3 @@
-debugger;
 angular.module("testApp", []).directive("sayHello", function() {
   return {
     scope: {
