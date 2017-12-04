@@ -854,6 +854,20 @@
                     filesCache.put(path, deferred.promise);
                 }
 
+                var completeHandler = function completeHandler(el) {
+                    loaded = 1;
+                    $delegate._broadcast('ocLazyLoad.fileLoaded', path);
+                    deferred.resolve(el);
+                };
+
+                var errorHandler = function errorHandler(message, ex) {
+                    filesCache.remove(path);
+                    if (ex) {
+                        message += ' => ' + ex.message;
+                    }
+                    deferred.reject(new Error(message));
+                };
+
                 // Switch in case more content types are added later
                 switch (type) {
                     case 'css':
@@ -867,34 +881,30 @@
                             // We have the script content now we can execute it.
                             try {
                                 if (params.debug === true) {
-                                    content = "debugger;\n" + content;
+                                    content = 'debugger;\n' + content;
                                 }
+
                                 eval(content);
-                                loaded = 1;
-                                $delegate._broadcast('ocLazyLoad.fileLoaded', path);
-                                deferred.resolve();
+                                completeHandler();
                             } catch (ex) {
-                                filesCache.remove(path);
-                                deferred.reject(new Error('Eval failed for script ' + path + '. => ' + ex.message));
+                                errorHandler('Eval failed for script ' + path + '.', ex);
                             }
+                        })['catch'](function (ex) {
+                            errorHandler('Unable to load script ' + path + '.', ex);
                         });
                         break;
                     default:
-                        filesCache.remove(path);
-                        deferred.reject(new Error('Requested type "' + type + '" is not known. Could not inject "' + path + '"'));
+                        errorHandler('Requested type "' + type + '" is not known. Could not inject "' + path + '"');
                         break;
                 }
                 if (el) {
                     el.onload = el['onreadystatechange'] = function (e) {
                         if (el['readyState'] && !/^c|loade/.test(el['readyState']) || loaded) return;
                         el.onload = el['onreadystatechange'] = null;
-                        loaded = 1;
-                        $delegate._broadcast('ocLazyLoad.fileLoaded', path);
-                        deferred.resolve(el);
+                        completeHandler(el);
                     };
                     el.onerror = function () {
-                        filesCache.remove(path);
-                        deferred.reject(new Error('Unable to load ' + path));
+                        errorHandler('Unable to load ' + path);
                     };
                     el.async = params.serie ? 0 : 1;
 
