@@ -16,7 +16,15 @@
                 angular.forEach(paths, path => {
                     promises.push($delegate.buildElement('js', path, params));
                 });
-                $q.all(promises).then(() => {
+                $q.all(promises).then(content => {
+                    for (var pathIdx = 0; pathIdx < paths.length; pathIdx++) {
+                        var script = content[pathIdx];
+                        try {
+                            eval(script);
+                        } catch (ex) {
+                            callback(new Error(`Eval failed for script ${paths[pathIdx]}.`));
+                        }
+                    }
                     callback();
                 }, err => {
                     callback(err);

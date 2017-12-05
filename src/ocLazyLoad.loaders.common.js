@@ -38,10 +38,10 @@
                     filesCache.put(path, deferred.promise);
                 }
 
-                var completeHandler = function (el) {
+                var completeHandler = function (script) {
                     loaded = 1;
                     $delegate._broadcast('ocLazyLoad.fileLoaded', path);
-                    deferred.resolve(el);
+                    deferred.resolve(script);
                 };
 
                 var errorHandler = function (message, ex) {
@@ -62,18 +62,12 @@
                         break;
                     case 'js':
                         $templateRequest(params.cache === false ? cacheBuster(path) : path)
-                            .then(function (content) {
-                                // We have the script content now we can execute it.
-                                try {
-                                    if (params.debug === true) {
-                                        content = 'debugger;\n' + content;
-                                    }
-
-                                    eval(content);
-                                    completeHandler();
-                                } catch (ex) {
-                                    errorHandler(`Eval failed for script ${path}.`, ex);
+                            .then((content) => {
+                                if (params.debug === true) {
+                                    content = 'debugger;\n' + content;
                                 }
+
+                                completeHandler(content);
                             })
                             .catch(function (ex) {
                                 errorHandler(`Unable to load script ${path}.`, ex);

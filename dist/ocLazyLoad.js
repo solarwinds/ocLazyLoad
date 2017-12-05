@@ -854,10 +854,10 @@
                     filesCache.put(path, deferred.promise);
                 }
 
-                var completeHandler = function completeHandler(el) {
+                var completeHandler = function completeHandler(script) {
                     loaded = 1;
                     $delegate._broadcast('ocLazyLoad.fileLoaded', path);
-                    deferred.resolve(el);
+                    deferred.resolve(script);
                 };
 
                 var errorHandler = function errorHandler(message, ex) {
@@ -878,17 +878,11 @@
                         break;
                     case 'js':
                         $templateRequest(params.cache === false ? cacheBuster(path) : path).then(function (content) {
-                            // We have the script content now we can execute it.
-                            try {
-                                if (params.debug === true) {
-                                    content = 'debugger;\n' + content;
-                                }
-
-                                eval(content);
-                                completeHandler();
-                            } catch (ex) {
-                                errorHandler('Eval failed for script ' + path + '.', ex);
+                            if (params.debug === true) {
+                                content = 'debugger;\n' + content;
                             }
+
+                            completeHandler(content);
                         })['catch'](function (ex) {
                             errorHandler('Unable to load script ' + path + '.', ex);
                         });
@@ -1253,7 +1247,15 @@
                 angular.forEach(paths, function (path) {
                     promises.push($delegate.buildElement('js', path, params));
                 });
-                $q.all(promises).then(function () {
+                $q.all(promises).then(function (content) {
+                    for (var pathIdx = 0; pathIdx < paths.length; pathIdx++) {
+                        var script = content[pathIdx];
+                        try {
+                            eval(script);
+                        } catch (ex) {
+                            callback(new Error('Eval failed for script ' + paths[pathIdx] + '.'));
+                        }
+                    }
                     callback();
                 }, function (err) {
                     callback(err);
