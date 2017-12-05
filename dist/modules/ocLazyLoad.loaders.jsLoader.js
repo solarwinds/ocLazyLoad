@@ -22,7 +22,7 @@
                         try {
                             eval(script);
                         } catch (ex) {
-                            callback(new Error('Eval failed for script ' + paths[pathIdx] + '.'));
+                            callback(new Error('Eval failed for script ' + paths[pathIdx] + '. => ' + ex.message));
                         }
                     }
                     callback();
